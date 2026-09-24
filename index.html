@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Handel — your hands are the instrument</title>
+  <meta name="description" content="Play music in the air with your webcam. Hand tracking + warm synths, drums and a conductor loop — 100% in your browser, nothing is uploaded." />
+  <meta name="theme-color" content="#06060b" />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Handel — your hands are the instrument" />
+  <meta property="og:description" content="Wave, pinch and make fists to play a theremin, chords, air drums or conduct a band. Runs on your device, nothing is uploaded." />
+  <meta property="og:url" content="https://chris-wozniczek.github.io/handel/" />
+  <meta property="og:image" content="https://chris-wozniczek.github.io/handel/assets/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Handel — your hands are the instrument" />
+  <meta name="twitter:description" content="Play music in the air with your webcam. Hand tracking + Web Audio, 100% on-device." />
+  <meta name="twitter:image" content="https://chris-wozniczek.github.io/handel/assets/og.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="attract" data-mode="theremin">
+  <canvas id="stage" aria-label="Live visuals of your hands playing music"></canvas>
+  <video id="cam" playsinline muted hidden></video>
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--a)"/><stop offset="1" stop-color="var(--c)"/></linearGradient></defs><path d="M4 20c3-9 6-9 8 0s5 9 8 0 5-9 8 0" fill="none" stroke="url(#mg)" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="20" r="2.2" fill="#fff"/></svg>
+      <span class="wordmark">handel</span>
+      <span class="tag">your hands are the instrument</span>
+    </div>
+    <div class="tools">
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">Demo · simulated hands</span></div>
+      <button class="chip" id="keyBtn" aria-haspopup="dialog" aria-expanded="false"><span class="chip-k">Key</span><span id="keyLabel">C · Major Pentatonic</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+      <button class="icon-btn" id="muteBtn" aria-label="Mute" title="Mute (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path class="wave" d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="x" d="M16 9.5l5 5m0-5l-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button class="icon-btn help" id="helpBtn" aria-label="How to play" title="How to play (?)">?</button>
+    </div>
+  </header>
+
+  <!-- Key / scale popover -->
+  <div class="popover glass" id="keyPop" role="dialog" aria-label="Key and scale" hidden>
+    <div class="pop-title">Key</div>
+    <div class="keys" id="keys"></div>
+    <div class="pop-title">Scale</div>
+    <div class="scales" id="scales"></div>
+    <p class="pop-note">Every note snaps to this scale, so it always sounds good.</p>
+  </div>
+
+  <!-- Attract / hero -->
+  <section class="hero" id="hero">
+    <p class="eyebrow"><span class="live-dot"></span>Live demo · watch the hands</p>
+    <h1>Your hands are<br /><em>the instrument.</em></h1>
+    <p class="lede">Play music in the air with your webcam. Raise a hand to soar, pinch to pluck, make a fist to drop the beat.</p>
+    <div class="cta">
+      <button class="btn primary" id="startBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6.5" width="13" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 10.5l5-3v9l-5-3z" fill="currentColor"/></svg><span>Start camera</span></button>
+      <button class="btn ghost" id="demoBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg><span>Play the demo</span></button>
+    </div>
+    <p class="privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Runs entirely on your device. No video or audio is ever uploaded.</p>
+  </section>
+
+  <!-- Contextual hint -->
+  <div class="hint" id="hint" aria-live="polite"></div>
+
+  <!-- Bottom dock -->
+  <nav class="dock glass" aria-label="Instrument">
+    <div class="modes" id="modes" role="tablist">
+      <span class="mode-ind" id="modeInd"></span>
+      <button role="tab" data-mode="theremin" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M3 15c2.5-7 4.5-7 6 0s3.5 7 6 0 4-6 6-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Theremin</span></button>
+      <button role="tab" data-mode="chords" aria-selected="false"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="4" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="10" y="4" width="4" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="16.5" y="4" width="4" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg><span>Chord Pad</span></button>
+      <button role="tab" data-mode="drums" aria-selected="false"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="9" rx="8" ry="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 9v6c0 1.8 3.6 3.2 8 3.2s8-1.4 8-3.2V9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 3l4 5M17 3l-4 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>Air Drums</span></button>
+      <button role="tab" data-mode="conductor" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 20L17 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="18.5" cy="5.5" r="2" fill="currentColor"/><path d="M13 19c2-1 4-1 6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Conductor</span></button>
+    </div>
+    <span class="dock-sep"></span>
+    <button class="rec" id="recBtn" aria-label="Record a 15 second clip" title="Record a 15s clip (R)">
+      <svg class="rec-ring" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="track"/><circle cx="22" cy="22" r="19" class="prog" id="recProg"/></svg>
+      <span class="rec-dot"></span>
+      <span class="rec-label" id="recLabel">Record</span>
+    </button>
+  </nav>
+
+  <!-- Help overlay -->
+  <div class="modal" id="help" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+    <div class="modal-card glass">
+      <button class="close" data-close aria-label="Close">×</button>
+      <p class="eyebrow">How to play</p>
+      <h2 id="helpTitle">Five moves. <em>That's the whole manual.</em></h2>
+      <div class="moves">
+        <div class="move"><div class="glyph g1"></div><h3>Raise &amp; lower</h3><p>Your <b>right hand</b> height sets the pitch. Notes snap to the scale.</p></div>
+        <div class="move"><div class="glyph g2"></div><h3>Pinch</h3><p>Touch <b>thumb + index</b> to pluck a bell note.</p></div>
+        <div class="move"><div class="glyph g3"></div><h3>Open &amp; close</h3><p>Your <b>left hand</b> opens the filter and the volume.</p></div>
+        <div class="move"><div class="glyph g4"></div><h3>Fist</h3><p>Close a hand into a <b>fist</b> for a drum hit.</p></div>
+        <div class="move"><div class="glyph g5"></div><h3>Spread</h3><p>Move <b>hands apart</b> for a bigger room reverb.</p></div>
+      </div>
+      <div class="mode-list">
+        <div><b>Theremin</b> glide + pluck melodies</div>
+        <div><b>Chord Pad</b> tap thumb to each finger for a chord</div>
+        <div><b>Air Drums</b> swipe down over a pad</div>
+        <div><b>Conductor</b> wave faster to speed up the band</div>
+      </div>
+      <p class="tips">Tip: good light, both hands in frame, about an arm's length from the camera. Hit <b>Record</b> for a 15-second clip to post.</p>
+      <div class="modal-foot">
+        <span class="privacy small"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>Everything runs on your device.</span>
+        <button class="btn primary" data-close>Let's play</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clip preview -->
+  <div class="modal" id="clip" role="dialog" aria-modal="true" aria-labelledby="clipTitle" hidden>
+    <div class="modal-card glass clip-card">
+      <button class="close" data-close aria-label="Close">×</button>
+      <p class="eyebrow">Your clip</p>
+      <h2 id="clipTitle">Fresh off the <em>air.</em></h2>
+      <video id="clipVideo" controls playsinline loop></video>
+      <div class="modal-foot">
+        <span class="privacy small" id="clipMeta"></span>
+        <div class="row">
+          <a class="btn ghost" id="shareX" target="_blank" rel="noopener">Post on X</a>
+          <a class="btn primary" id="downloadBtn" download>Download</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="countdown" id="countdown" aria-hidden="true"></div>
+
+  <noscript><div class="noscript">Handel needs JavaScript to make music.</div></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
