@@ -164,7 +164,7 @@ body:not(.attract) .hero { opacity: 0; transform: translateY(-46%) scale(.98); f
   display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 22px;
 }
 .modes { position: relative; display: flex; gap: 2px; }
-.modes button {
+.modes button { white-space: nowrap;
   position: relative; z-index: 1; height: 52px; padding: 0 16px; border-radius: 16px;
   display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 450; color: var(--muted);
   transition: color .3s var(--ease);
