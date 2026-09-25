@@ -295,3 +295,5 @@ body.recording .topbar, body.recording .hint { opacity: .25; transition: opacity
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+#cam { position: fixed; left: 0; top: 0; width: 4px; height: 4px; opacity: 0.01; pointer-events: none; z-index: -1; }

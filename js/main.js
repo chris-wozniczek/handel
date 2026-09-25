@@ -559,12 +559,30 @@ window.addEventListener('keydown', (e) => {
 let last = performance.now();
 let attractModeT = performance.now();
 function frame(now) {
+  requestAnimationFrame(frame);
+  try {
+    tick(now);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+let trackErrors = 0;
+function tick(now) {
   const dt = clamp((now - last) / 1000, 0, 0.05);
   last = now;
   const t = now / 1000;
 
   if (state.source === 'camera') {
-    if (tracker.detect()) gestures.setTargets(cameraTargets(), now);
+    let fresh = false;
+    try {
+      fresh = tracker.detect();
+      trackErrors = 0;
+    } catch (e) {
+      if (++trackErrors === 1) console.warn('Hand tracking frame failed', e);
+      if (trackErrors === 30) tracker.fallbackToCpu();
+    }
+    if (fresh) gestures.setTargets(cameraTargets(), now);
   } else {
     gestures.setTargets(demoTargets(t), now);
     if (state.source === 'attract' && !state.attractLocked && now - attractModeT > 7000) {
@@ -606,7 +624,6 @@ function frame(now) {
     safeTop: 90,
     safeBottom: 110,
   }, dt, t);
-  requestAnimationFrame(frame);
 }
 
 let statusCache = '';

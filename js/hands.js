@@ -43,6 +43,7 @@ export class CameraTracker {
         minHandPresenceConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
+    this._make = make;
     try {
       this.landmarker = await make('GPU');
     } catch (e) {
@@ -63,6 +64,21 @@ export class CameraTracker {
     await this.video.play();
   }
 
+  async fallbackToCpu() {
+    if (!this._make || this._cpu) return;
+    this._cpu = true;
+    const old = this.landmarker;
+    this.landmarker = null;
+    try {
+      this.landmarker = await this._make('CPU');
+      this.lastVideoTime = -1;
+      old?.close();
+    } catch (e) {
+      console.error(e);
+      this.landmarker = old;
+    }
+  }
+
   stop() {
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
@@ -71,6 +87,14 @@ export class CameraTracker {
   /** Runs detection if a new video frame is available. Returns true when `latest` was updated. */
   detect() {
     const v = this.video;
+    if (v.paused && this.stream) v.play().catch(() => {});
+    if (v.currentTime !== this.lastVideoTime) this._stallT = performance.now();
+    else if (this.stream && performance.now() - (this._stallT || 0) > 2000) {
+      this._stallT = performance.now();
+      this.latest = { left: null, right: null };
+      v.srcObject = this.stream;
+      v.play().catch(() => {});
+    }
     if (!this.landmarker || v.readyState < 2 || v.currentTime === this.lastVideoTime) return false;
     this.lastVideoTime = v.currentTime;
     const res = this.landmarker.detectForVideo(v, performance.now());
