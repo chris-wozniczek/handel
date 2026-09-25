@@ -467,6 +467,7 @@ function maybeShowHelp() {
 
 function leaveAttract(source) {
   state.source = source;
+  document.body.dataset.source = source;
   document.body.classList.remove('attract');
   gestures.hands.left.reset();
   gestures.hands.right.reset();
@@ -479,10 +480,17 @@ async function startDemo() {
   setStatus('demo', 'Demo · simulated hands');
   if (ok) applyKey();
   maybeShowHelp();
-  showHint('Demo mode: simulated hands are playing<span class="sep">·</span>press <b>Start camera</b> anytime with <b>C</b>');
+  showHint('Demo mode: simulated hands are playing<span class="sep">·</span>hit <b>Start camera</b> up top (or press <b>C</b>) to play with your hands');
 }
 
 const startBtn = $('#startBtn');
+const camBtn = $('#camBtn');
+function startUi(text, loading) {
+  for (const b of [startBtn, camBtn]) {
+    b.classList.toggle('loading', loading);
+    b.querySelector('span').textContent = text;
+  }
+}
 async function startCamera() {
   if (state.source === 'camera') return;
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -490,15 +498,13 @@ async function startCamera() {
     startDemo();
     return;
   }
-  startBtn.classList.add('loading');
-  startBtn.querySelector('span').textContent = 'Waking up the camera…';
+  startUi('Waking up the camera…', true);
   const audioOk = ensureAudio();
   try {
     await tracker.startCamera();
   } catch (e) {
     console.warn(e);
-    startBtn.classList.remove('loading');
-    startBtn.querySelector('span').textContent = 'Start camera';
+    startUi('Start camera', false);
     const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
     toast(denied
       ? 'Camera access was blocked. Allow it from the address bar to play with your hands — here’s the demo meanwhile.'
@@ -508,21 +514,19 @@ async function startCamera() {
     return;
   }
   try {
-    startBtn.querySelector('span').textContent = 'Loading hand model…';
+    startUi('Loading hand model…', true);
     if (!tracker.landmarker) await tracker.load();
   } catch (e) {
     console.error(e);
     tracker.stop();
-    startBtn.classList.remove('loading');
-    startBtn.querySelector('span').textContent = 'Start camera';
+    startUi('Start camera', false);
     toast('The hand-tracking model couldn’t load (offline?). Playing the demo instead.', 6500);
     await audioOk;
     startDemo();
     return;
   }
   await audioOk;
-  startBtn.classList.remove('loading');
-  startBtn.querySelector('span').textContent = 'Start camera';
+  startUi('Start camera', false);
   leaveAttract('camera');
   setStatus('live', 'Live · looking for hands');
   state.lastHandsSeen = performance.now();
@@ -531,6 +535,7 @@ async function startCamera() {
 }
 
 startBtn.onclick = startCamera;
+camBtn.onclick = startCamera;
 $('#demoBtn').onclick = startDemo;
 
 document.querySelectorAll('#modes button').forEach((b) => {

@@ -309,3 +309,10 @@ body.recording .topbar, body.recording .hint { opacity: .25; transition: opacity
 .bands button[aria-pressed='true'] { border-color: color-mix(in srgb, var(--a) 60%, transparent); background: color-mix(in srgb, var(--a) 14%, transparent); box-shadow: 0 8px 26px -12px var(--a); }
 .bands button[aria-pressed='true'] .bd { color: var(--text); }
 @media (max-width: 760px) { #bandBtn .chip-k { display: none; } }
+
+/* Demo → live camera, always one click away */
+.tools .cam-chip { display: none; gap: 8px; font-weight: 600; color: #120d10; border-color: transparent; background: linear-gradient(135deg, #fff, var(--a)); box-shadow: 0 8px 26px -10px var(--a); }
+.tools .cam-chip svg { width: 16px; height: 16px; }
+.tools .cam-chip:hover { transform: translateY(-1px); box-shadow: 0 12px 32px -10px var(--a); }
+.tools .cam-chip.loading { opacity: .7; pointer-events: none; }
+body[data-source="demo"] .tools .cam-chip { display: inline-flex; }
