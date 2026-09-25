@@ -27,8 +27,8 @@ Play music in the air with your webcam. Raise a hand to soar, pinch to pluck, ma
 Modes:
 - **Theremin** — glide a warm lead, pluck melodies with pinches. On-screen note guides show where each scale note sits.
 - **Chord Pad** — tap your thumb to each fingertip; every finger is a diatonic chord in your key.
-- **Air Drums** — swipe down fast over a pad (kick, snare, hat, clap, tom).
-- **Conductor** — a looping band follows you: wave faster to speed up the tempo, raise hands for more layers.
+- **Air Drums** — tap an index fingertip into a pad (or swipe down over it): kick, snare, hat, clap, tom.
+- **Conductor** — a looping band follows you: wave faster to speed up the tempo, raise hands for more layers. Pick the backing band from the **Band** menu (or press `B`): Warm Pop, Lo-fi, Disco or Ambient.
 
 Hit **Record** for a 15-second clip (visuals + audio) and download it as MP4/WebM to post to X.
 Keyboard: `1–4` modes, `R` record, `C` camera, `M` mute, `?` help.

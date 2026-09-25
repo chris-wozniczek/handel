@@ -350,7 +350,7 @@ export class Gestures {
       for (let f = 0; f < 4; f++) {
         const r = dist(P[4], P[8 + f * 4], aspect) / size;
         h.touchRatio[f] = r;
-        if (!h.touch[f] && r < 0.28 && h.open > 0.15) {
+        if (!h.touch[f] && r < 0.34 && h.open > 0.12) {
           // Only the closest finger fires.
           let best = f;
           for (let g = 0; g < 4; g++) if (dist(P[4], P[8 + g * 4], aspect) / size < r) best = g;
@@ -358,7 +358,7 @@ export class Gestures {
             h.touch[f] = true;
             this.emit('touch', side, { finger: f, x: P[8 + f * 4].x, y: P[8 + f * 4].y });
           }
-        } else if (h.touch[f] && r > 0.45) h.touch[f] = false;
+        } else if (h.touch[f] && r > 0.48) h.touch[f] = false;
       }
 
       // Downward strike (air drums)

@@ -1,5 +1,5 @@
 import { CameraTracker, Gestures, synthHand, demoPose } from './hands.js';
-import { AudioEngine } from './audio.js';
+import { AudioEngine, BANDS, BAND_ORDER } from './audio.js';
 import { Visuals, PALETTES } from './visuals.js';
 import { Recorder } from './recorder.js';
 import { NOTE_NAMES, SCALES, scaleNotes, chord, chordLabel, pcName } from './music.js';
@@ -11,7 +11,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const MODES = {
   theremin: { label: 'Theremin', hint: '<b>Right hand</b> up/down = pitch<span class="sep">·</span><b>Pinch</b> = pluck<span class="sep">·</span><b>Left hand</b> open = tone<span class="sep">·</span><b>Fist</b> = boom' },
   chords: { label: 'Chord Pad', hint: 'Tap your <b>thumb</b> to each <b>fingertip</b> for a chord<span class="sep">·</span><b>Left hand</b> open = brightness' },
-  drums: { label: 'Air Drums', hint: '<b>Swipe down fast</b> over a pad<span class="sep">·</span><b>Fist</b> = boom + crash' },
+  drums: { label: 'Air Drums', hint: '<b>Tap into a pad</b> with a fingertip (or swipe down over it)<span class="sep">·</span><b>Fist</b> = boom + crash' },
   conductor: { label: 'Conductor', hint: '<b>Wave</b> faster to speed up<span class="sep">·</span><b>Raise hands</b> for more energy<span class="sep">·</span>Hands apart = space' },
 };
 const MODE_ORDER = ['theremin', 'chords', 'drums', 'conductor'];
@@ -26,6 +26,7 @@ const RIGHT_DEGREES = [0, 4, 5, 3];
 const LEFT_DEGREES = [1, 2, 0, 4];
 
 const state = {
+  band: 'pop',
   mode: 'theremin',
   root: 0,
   scale: 'Major Pentatonic',
@@ -146,11 +147,47 @@ function applyKey() {
   if (audio.ready && state.source !== 'attract') audio.strum(tri, 0.5);
 }
 
+function setBand(id, fromUser = false) {
+  const b = BANDS[id];
+  if (!b) return;
+  state.band = id;
+  audio.setBand(id);
+  state.bpm = b.tempo[2];
+  $('#bandLabel').textContent = b.name;
+  document.querySelectorAll('#bands button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.band === id)));
+  if (fromUser && state.mode !== 'conductor') setMode('conductor', true);
+  if (fromUser) showHint(`<b>${b.name}</b><span class="sep">·</span>${b.desc}<span class="sep">·</span>press <b>B</b> for the next band`);
+}
+function buildBandPicker() {
+  const list = $('#bands');
+  BAND_ORDER.forEach((id) => {
+    const b = BANDS[id];
+    const btn = document.createElement('button');
+    btn.dataset.band = id;
+    btn.innerHTML = `<span class="bn">${b.name}</span><span class="bd">${b.desc} · ${b.tempo[2]} BPM</span>`;
+    btn.setAttribute('aria-pressed', String(id === state.band));
+    btn.onclick = () => { setBand(id, true); toggleBandPop(false); if (state.source === 'attract') startDemo(); };
+    list.appendChild(btn);
+  });
+}
+const bandBtn = $('#bandBtn');
+const bandPop = $('#bandPop');
+function toggleBandPop(open = bandPop.hidden) {
+  bandPop.hidden = !open;
+  bandBtn.setAttribute('aria-expanded', String(open));
+  if (open) toggleKeyPop(false);
+}
+bandBtn.onclick = (e) => { e.stopPropagation(); toggleBandPop(); };
+document.addEventListener('pointerdown', (e) => {
+  if (!bandPop.hidden && !bandPop.contains(e.target) && !bandBtn.contains(e.target)) toggleBandPop(false);
+});
+
 const keyBtn = $('#keyBtn');
 const keyPop = $('#keyPop');
 function toggleKeyPop(open = keyPop.hidden) {
   keyPop.hidden = !open;
   keyBtn.setAttribute('aria-expanded', String(open));
+  if (open) toggleBandPop(false);
 }
 keyBtn.onclick = (e) => { e.stopPropagation(); toggleKeyPop(); };
 document.addEventListener('pointerdown', (e) => {
@@ -229,6 +266,42 @@ function rebuildChordLabels() {
 /* ------------------------------------------------------------------ */
 /* Gesture events                                                      */
 /* ------------------------------------------------------------------ */
+function drumPadRect(i) {
+  const W = visuals.W, H = visuals.H, n = PADS.length, gap = 12;
+  const padW = Math.min(170, (W - 48 - gap * (n - 1)) / n);
+  const totalW = padW * n + gap * (n - 1);
+  const padH = Math.min(92, H * 0.12);
+  return { x: (W - totalW) / 2 + i * (padW + gap), y: H - 110 - padH - 72, w: padW, h: padH, gap };
+}
+function inDrumZone(i, nx, ny, slack = 0) {
+  const r = drumPadRect(i), px = nx * visuals.W, py = ny * visuals.H, m = r.gap / 2 + slack;
+  return px >= r.x - m && px <= r.x + r.w + m && py >= r.y - r.h * 0.6 - m && py <= r.y + r.h + 24 + m;
+}
+function hitDrum(i, v, x, y) {
+  audio.drum(PADS[i].sound, 0.5 + v * 0.5);
+  visuals.flashKey('pad' + i);
+  const r = drumPadRect(i);
+  visuals.burst(x, Math.max(y, (r.y + r.h / 2) / visuals.H * 0.9), 20, i, 0.9 + v * 0.5);
+  visuals.ring(x, y, i, 0.6 + v);
+}
+/* Touch-to-hit: a fingertip entering a drum pad hits it; it must leave (with slack) before that pad re-triggers. */
+const drumTouch = { left: { pad: -1, t: 0 }, right: { pad: -1, t: 0 } };
+function drumTouchUpdate(now) {
+  for (const side of ['left', 'right']) {
+    const h = gestures.hands[side], ds = drumTouch[side];
+    if (!h.present || !h.pts) { ds.pad = -1; continue; }
+    const tip = h.pts[8];
+    if (ds.pad >= 0 && inDrumZone(ds.pad, tip.x, tip.y, 18)) continue;
+    let i = -1;
+    for (let k = 0; k < PADS.length; k++) if (inDrumZone(k, tip.x, tip.y)) { i = k; break; }
+    if (i >= 0 && now - ds.t > 70) {
+      hitDrum(i, clamp(0.45 + h.speed * 0.3, 0.35, 1), tip.x, tip.y);
+      ds.t = now;
+    }
+    ds.pad = i;
+  }
+}
+
 function padIndexAt(x) {
   const W = visuals.W, n = PADS.length, gap = 12;
   const padW = Math.min(170, (W - 48 - gap * (n - 1)) / n);
@@ -268,13 +341,10 @@ gestures.on((type, side, d) => {
     visuals.ring(d.x, d.y, colorIdx, 1.4);
   }
   if (mode === 'drums' && type === 'strike') {
-    const i = padIndexAt(d.x);
-    const pad = PADS[i];
-    audio.drum(pad.sound, 0.5 + d.v * 0.5);
-    visuals.flashKey('pad' + i);
-    const yPad = 1 - (visuals.H * 0.0 + 190) / visuals.H;
-    visuals.burst(d.x, Math.max(d.y, yPad * 0.9), 20, i, 0.9 + d.v * 0.5);
-    visuals.ring(d.x, d.y, i, 0.6 + d.v);
+    const ds = drumTouch[side];
+    if (state.source === 'camera' && performance.now() - ds.t < 180) return;
+    hitDrum(padIndexAt(d.x), d.v, d.x, d.y);
+    ds.t = performance.now();
   }
 });
 
@@ -325,7 +395,8 @@ function continuous(dt) {
   } else if (state.mode === 'conductor') {
     const sp = Math.max(L.present ? L.speed : 0, R.present ? R.speed : 0);
     const any = L.present || R.present;
-    const target = any ? 62 + clamp(sp / 2.4) * 100 : 84;
+    const [lo, hi, idle] = audio.band.tempo;
+    const target = any ? lo + clamp(sp / 2.4) * (hi - lo) : idle;
     state.bpm = lerp(state.bpm, target, 1 - Math.exp(-dt * 1.2));
     audio.setTempo(state.bpm);
     const ys = [L, R].filter((h) => h.present).map((h) => h.palm.y);
@@ -545,10 +616,11 @@ recBtn.onclick = async () => {
 /* ------------------------------------------------------------------ */
 window.addEventListener('keydown', (e) => {
   if (e.target.closest?.('input, textarea')) return;
-  if (e.key === 'Escape') { document.querySelectorAll('.modal').forEach(closeModal); toggleKeyPop(false); }
+  if (e.key === 'Escape') { document.querySelectorAll('.modal').forEach(closeModal); toggleKeyPop(false); toggleBandPop(false); }
   else if (e.key === '?' || e.key === 'h') openModal($('#help'));
   else if (e.key >= '1' && e.key <= '4') setMode(MODE_ORDER[+e.key - 1], true);
   else if (e.key === 'm') muteBtn.click();
+  else if (e.key === 'b') setBand(BAND_ORDER[(BAND_ORDER.indexOf(state.band) + 1) % BAND_ORDER.length], true);
   else if (e.key === 'r') recBtn.click();
   else if (e.key === 'c') startCamera();
 });
@@ -593,6 +665,7 @@ function tick(now) {
   const aspect = visuals.W / visuals.H;
   gestures.update(dt, aspect, now);
   continuous(dt);
+  if (state.mode === 'drums' && state.source === 'camera') drumTouchUpdate(now);
 
   if (state.source === 'camera') {
     const n = (gestures.hands.left.present ? 1 : 0) + (gestures.hands.right.present ? 1 : 0);
@@ -640,6 +713,7 @@ window.addEventListener('resize', () => { visuals.resize(); moveIndicator(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) audio.leadOff(); });
 
 buildKeyPicker();
+buildBandPicker();
 updateKeyLabel();
 rebuildGuide();
 rebuildChordLabels();

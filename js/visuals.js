@@ -497,7 +497,7 @@ export class Visuals {
         ctx.fillStyle = `rgba(255,255,255,${0.018 + on * 0.05})`;
         ctx.fillRect(x, top, padW, y0 - top - 10);
       });
-      this._label('SWIPE DOWN FAST OVER A PAD · MAKE A FIST FOR A BOOM', W / 2, y0 - 22, { align: 'center', size: 10, color: 'rgba(255,255,255,0.42)' });
+      this._label('TAP INTO A PAD WITH A FINGERTIP · MAKE A FIST FOR A BOOM', W / 2, y0 - 22, { align: 'center', size: 10, color: 'rgba(255,255,255,0.42)' });
     }
 
     if (scene.mode === 'conductor' && scene.conductor) {

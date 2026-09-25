@@ -9,8 +9,34 @@ export async function loadTone() {
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 
+// Conductor backing bands: one sequencer, four grooves (16th steps per bar).
+export const BANDS = {
+  pop: {
+    name: 'Warm Pop', desc: 'four on the floor, bell arps', prog: [0, 4, 5, 3],
+    kick: [0, 4, 8, 12], snare: [4, 12], hats: 'off', bass: [0, 3, 6, 10, 11, 14], octBass: false,
+    swing: 0, arpAt: 0.55, tempo: [62, 162, 84],
+  },
+  lofi: {
+    name: 'Lo-fi', desc: 'lazy swing, dusty kick and snare', prog: [1, 4, 0, 5],
+    kick: [0, 7, 10], snare: [4, 12], hats: 'eighths', bass: [0, 7, 10], octBass: false,
+    swing: 0.45, arpAt: 0.45, tempo: [58, 112, 76],
+  },
+  disco: {
+    name: 'Disco', desc: 'off-beat hats, octave bass', prog: [0, 3, 4, 5],
+    kick: [0, 4, 8, 12], snare: [4, 12], hats: 'disco', bass: [0, 2, 4, 6, 8, 10, 12, 14], octBass: true,
+    swing: 0, arpAt: 0.6, tempo: [96, 150, 118],
+  },
+  ambient: {
+    name: 'Ambient', desc: 'no drums, slow pads, glassy arps', prog: [0, 5, 3, 4],
+    kick: [], snare: [], hats: 'none', bass: [0], octBass: false,
+    swing: 0, arpAt: 0, tempo: [48, 100, 66],
+  },
+};
+export const BAND_ORDER = ['pop', 'lofi', 'disco', 'ambient'];
+
 export class AudioEngine {
   constructor() {
+    this.band = BANDS.pop;
     this.ready = false;
     this.root = 0;
     this.scale = 'Major Pentatonic';
@@ -147,6 +173,8 @@ export class AudioEngine {
 
     this.transport = T.getTransport();
     this.transport.bpm.value = 96;
+    this.transport.swingSubdivision = '16n';
+    this.transport.swing = this.band.swing;
     this.loop = new T.Loop((time) => this._tick(time), '16n');
     this.loopGain = 1;
     this.ready = true;
@@ -156,6 +184,11 @@ export class AudioEngine {
   now() { return Tone.now(); }
 
   setKey(root, scale) { this.root = root; this.scale = scale; }
+  setBand(id) {
+    if (!BANDS[id]) return;
+    this.band = BANDS[id];
+    if (this.ready) this.transport.swing = this.band.swing;
+  }
 
   /* ---------------- Theremin ---------------- */
   leadOn(midi) {
@@ -262,21 +295,25 @@ export class AudioEngine {
     const bar = Math.floor(this.step / 16) % 4;
     const I = this.intensity;
     const g = this.loopGain;
-    const prog = [0, 4, 5, 3];
-    const deg = prog[bar];
+    const B = this.band;
+    const deg = B.prog[bar];
     const tri = chord(this.root, this.scale, deg, 48, true);
     if (g > 0.02) {
-      if (s % 4 === 0) this.drum('kick', 0.85 * g, time);
-      if (I > 0.3 && (s === 4 || s === 12)) this.drum(I > 0.7 ? 'clap' : 'snare', 0.7 * g, time);
-      if (I > 0.12 && s % 2 === 1) this.drum('hat', (s % 4 === 3 ? 0.7 : 0.4) * g, time);
-      if ([0, 3, 6, 10, 11, 14].includes(s) && I > 0.2) {
-        const bassNote = tri[0] - 12 + (s === 14 && I > 0.5 ? 7 : 0);
+      if (B.kick.includes(s)) this.drum('kick', 0.85 * g, time);
+      if (I > 0.3 && B.snare.includes(s)) this.drum(I > 0.7 ? 'clap' : 'snare', 0.7 * g, time);
+      if (I > 0.12) {
+        if (B.hats === 'off' && s % 2 === 1) this.drum('hat', (s % 4 === 3 ? 0.7 : 0.4) * g, time);
+        else if (B.hats === 'eighths' && s % 2 === 0) this.drum('hat', (s % 4 === 0 ? 0.55 : 0.35) * g, time);
+        else if (B.hats === 'disco' && s % 2 === 0) this.drum('hat', (s % 4 === 2 ? 0.85 : 0.3) * g, time);
+      }
+      if (B.bass.includes(s) && I > 0.2) {
+        const bassNote = tri[0] - 12 + (B.octBass && s % 4 === 2 ? 12 : 0) + (!B.octBass && s === 14 && I > 0.5 ? 7 : 0);
         this.bass.triggerAttackRelease(midiToFreq(bassNote), '16n', time, 0.8 * g);
       }
       if (s === 0) {
         tri.forEach((m, i) => this.pad.triggerAttackRelease(midiToFreq(m + 12), '1m', time + i * 0.012, 0.55 * g));
       }
-      if (I > 0.55) {
+      if (I > B.arpAt) {
         const arp = [0, 1, 2, 3, 2, 1, 0, 2];
         if (s % 2 === 0 || I > 0.85) {
           const m = tri[arp[(s >> (I > 0.85 ? 0 : 1)) % 8] % tri.length] + 24;
